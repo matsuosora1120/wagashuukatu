@@ -5,6 +5,9 @@ from google.oauth2.service_account import Credentials
 import pandas as pd
 import streamlit as st
 
+# Streamlitの機能を使ってクリップボードコピーを有効化
+import streamlit.components.v1 as components
+
 # ==========================================
 # 1. ページ設定 & ユーザー認証情報
 # ==========================================
@@ -101,7 +104,6 @@ def load_data_from_sheet():
         )
 
     df = pd.DataFrame(data[1:], columns=data[0])
-    # 不足列の補正
     expected_cols = [
         "企業名",
         "業界",
@@ -149,7 +151,6 @@ if not st.session_state["logged_in"]:
 # ==========================================
 # 4. メイン画面（ログイン後）
 # ==========================================
-# サイドバー
 st.sidebar.write(f"👤 **ログイン中:** `{st.session_state['username']}`")
 if st.sidebar.button("🚪 ログアウト"):
     st.session_state["logged_in"] = False
@@ -158,10 +159,8 @@ if st.sidebar.button("🚪 ログアウト"):
 
 st.title("💼 就活エントリー管理 Webアプリ")
 
-# データの読み込み
 df = load_data_from_sheet()
 
-# --- データ登録・編集フォーム ---
 st.subheader("📝 データの登録 / 編集")
 
 with st.expander("企業情報の追加・更新・削除", expanded=True):
@@ -192,13 +191,26 @@ with st.expander("企業情報の追加・更新・削除", expanded=True):
         )
         init_status, init_memo, init_url = "エントリー済", "", ""
 
-    # コピー用の簡易表示（既存企業選択時のみ）
-    if selected_company != "【新規登録】" and init_my_id:
-        st.markdown("**📋 コピー用ログイン情報（右端アイコンで1タップコピー）**")
-        c_copy1, c_copy2 = st.columns(2)
-        c_copy1.code(init_my_id, language=None)
+    # ★ 1タップでコピーできるボタンの配置
+    if selected_company != "【新規登録】":
+        st.markdown("**📋 ワンタップでコピー**")
+        cp_col1, cp_col2 = st.columns(2)
+
+        if init_my_id:
+            if cp_col1.button(f"📋 IDをコピー ({init_my_id})"):
+                components.html(
+                    f"<script>navigator.clipboard.writeText('{init_my_id}');</script>",
+                    height=0,
+                )
+                st.toast("IDをコピーしました！", icon="✅")
+
         if init_password:
-            c_copy2.code(init_password, language=None)
+            if cp_col2.button(f"📋 パスワードをコピー"):
+                components.html(
+                    f"<script>navigator.clipboard.writeText('{init_password}');</script>",
+                    height=0,
+                )
+                st.toast("パスワードをコピーしました！", icon="✅")
 
     with st.form("entry_form"):
         c1, c2 = st.columns(2)
@@ -271,10 +283,6 @@ if filter_ind != "すべて":
     display_df = display_df[display_df["業界"] == filter_ind]
 
 display_df = display_df.sort_values(by="業界", ascending=True)
-
-st.info(
-    "💡 表の見出し（「業界」「ステータス」など）をクリックするとソートできます。"
-)
 
 st.dataframe(
     display_df,
