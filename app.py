@@ -4,46 +4,39 @@ import gspread
 from google.oauth2.service_account import Credentials
 import pandas as pd
 import streamlit as st
-import streamlit.components.v1 as components
 
 # ==========================================
-# 1. ページ設定 & CSS・JS（タブレットキーボード防止処理）
+# 1. ページ設定 & CSS（タブレットキーボード起動の強制遮断）
 # ==========================================
 st.set_page_config(
     page_title="就活エントリー管理", page_icon="💼", layout="wide"
 )
 
-# ① CSS: カーソルを非表示にし、ポインターイベントを制御
+# セレクトボックス（ドロップダウン）の入力欄へのフォーカス・キーボード起動をCSSで強力に無効化
 st.markdown(
     """
     <style>
-    /* selectboxのテキスト入力欄へのタイピング・カーソル表示を無効化 */
+    /* 1. selectbox内のinputタグへの直接タッチ・フォーカスを禁止 */
     div[data-baseweb="select"] input {
-        caret-color: transparent !important;
         pointer-events: none !important;
+        caret-color: transparent !important;
+        -webkit-user-select: none !important;
+        user-select: none !important;
+    }
+    
+    /* 2. ドロップダウン全体をクリック可能にしつつフォーカスカーソルを消す */
+    div[data-baseweb="select"] {
+        cursor: pointer !important;
+    }
+    
+    /* 3. モバイル端末でのフォーカス枠・ハイライトを非表示 */
+    div[data-baseweb="select"] *:focus {
+        outline: none !important;
+        box-shadow: none !important;
     }
     </style>
     """,
     unsafe_allow_html=True,
-)
-
-# ② JavaScript: タブレットでタップした際にソフトキーボードが立ち上がるのを完全に防止
-components.html(
-    """
-    <script>
-    const setSelectReadonly = () => {
-        const inputs = parent.document.querySelectorAll('div[data-baseweb="select"] input');
-        inputs.forEach(input => {
-            input.setAttribute('readonly', 'true');
-            input.setAttribute('inputmode', 'none');
-        });
-    };
-    // 画面ロード時および定期的にreadonly属性を適用
-    setSelectReadonly();
-    setInterval(setSelectReadonly, 1000);
-    </script>
-    """,
-    height=0,
 )
 
 # ログイン用ユーザー情報 (ユーザー名: パスワード)
