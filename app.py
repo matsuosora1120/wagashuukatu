@@ -47,24 +47,33 @@ STATUS_LIST = [
 
 
 # ==========================================
-# 2. スプレッドシート接続
+# 2. スプレッドシート接続（Cloud / ローカル自動判定）
 # ==========================================
 @st.cache_resource
 def get_sheet():
-    if not os.path.exists(CREDENTIALS_FILE):
-        st.error(
-            f"認証ファイル『{CREDENTIALS_FILE}』が見つかりません。同じフォルダに配置してください。"
-        )
-        st.stop()
-
     scopes = [
         "https://www.googleapis.com/auth/spreadsheets",
         "https://www.googleapis.com/auth/drive",
     ]
+
     try:
-        creds = Credentials.from_service_account_file(
-            CREDENTIALS_FILE, scopes=scopes
-        )
+        # ① クラウド環境（Streamlit Secrets）の鍵を使う
+        if "gcp_service_account" in st.secrets:
+            creds_dict = dict(st.secrets["gcp_service_account"])
+            creds = Credentials.from_service_account_info(
+                creds_dict, scopes=scopes
+            )
+        # ② 自分のPC環境の credentials.json を使う
+        elif os.path.exists(CREDENTIALS_FILE):
+            creds = Credentials.from_service_account_file(
+                CREDENTIALS_FILE, scopes=scopes
+            )
+        else:
+            st.error(
+                "認証情報が見つかりません。Streamlit Secrets または credentials.json を配置してください。"
+            )
+            st.stop()
+
         client = gspread.authorize(creds)
         spreadsheet = client.open(SPREADSHEET_NAME)
         return spreadsheet.sheet1
@@ -136,6 +145,7 @@ if not st.session_state["logged_in"]:
                 st.error("ユーザーIDまたはパスワードが正しくありません。")
 
     st.stop()  # 未ログイン時はここで処理を停止
+
 
 # ==========================================
 # 4. メイン画面（ログイン後）
@@ -258,10 +268,9 @@ display_df = df.copy()
 if filter_ind != "すべて":
     display_df = display_df[display_df["業界"] == filter_ind]
 
-# デフォルトで業界順（あいうえお順）に初期ソート
+# デフォルトで業界順に初期ソート
 display_df = display_df.sort_values(by="業界", ascending=True)
 
-# データフレームをブラウザ上に表示（列ヘッダークリックで表全体をソート可能）
 st.info(
     "💡 表の見出し（「業界」「ステータス」など）をクリックすると、昇順・降順に並び替えできます。"
 )
@@ -271,6 +280,6 @@ st.dataframe(
     use_container_width=True,
     hide_index=True,
     column_config={
-        "URL": st.column_config.LinkColumn("マイページURL"),  # クリックで開くリンク化
+        "URL": st.column_config.LinkColumn("マイページURL"),  # クリック可能なリンク
     },
 )
