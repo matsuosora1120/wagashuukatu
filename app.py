@@ -6,37 +6,10 @@ import pandas as pd
 import streamlit as st
 
 # ==========================================
-# 1. ページ設定 & CSS（タブレットキーボード起動の強制遮断）
+# 1. ページ設定
 # ==========================================
 st.set_page_config(
     page_title="就活エントリー管理", page_icon="💼", layout="wide"
-)
-
-# セレクトボックス（ドロップダウン）の入力欄へのフォーカス・キーボード起動をCSSで強力に無効化
-st.markdown(
-    """
-    <style>
-    /* 1. selectbox内のinputタグへの直接タッチ・フォーカスを禁止 */
-    div[data-baseweb="select"] input {
-        pointer-events: none !important;
-        caret-color: transparent !important;
-        -webkit-user-select: none !important;
-        user-select: none !important;
-    }
-    
-    /* 2. ドロップダウン全体をクリック可能にしつつフォーカスカーソルを消す */
-    div[data-baseweb="select"] {
-        cursor: pointer !important;
-    }
-    
-    /* 3. モバイル端末でのフォーカス枠・ハイライトを非表示 */
-    div[data-baseweb="select"] *:focus {
-        outline: none !important;
-        box-shadow: none !important;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True,
 )
 
 # ログイン用ユーザー情報 (ユーザー名: パスワード)
@@ -188,9 +161,7 @@ df = load_data_from_sheet()
 st.subheader("📝 データの登録 / 編集")
 
 with st.expander("企業情報の追加・更新・削除", expanded=True):
-    col_a, col_b = st.columns(2)
-
-    # 業界順にソートしたドロップダウン選択肢の作成
+    # 業界順にソートした選択肢の作成
     df_sorted = df.copy()
     industry_order = {ind: idx for idx, ind in enumerate(INDUSTRY_LIST)}
     df_sorted["industry_rank"] = df_sorted["業界"].map(
@@ -205,8 +176,11 @@ with st.expander("企業情報の追加・更新・削除", expanded=True):
         label = f"【{r['業界'] if r['業界'] else '未設定'}】 {r['企業名']}"
         options_map[label] = r["企業名"]
 
-    selected_label = col_a.selectbox(
-        "編集する企業を選択（業界別順）", list(options_map.keys())
+    # ▼ キーボードが出ないラジオボタン型で選択
+    selected_label = st.radio(
+        "編集する企業を選択（業界別順）",
+        options=list(options_map.keys()),
+        horizontal=True,
     )
     selected_company = options_map[selected_label]
 
@@ -262,17 +236,23 @@ with st.expander("企業情報の追加・更新・削除", expanded=True):
     with st.form("entry_form"):
         c1, c2 = st.columns(2)
         company = c1.text_input("企業名*", value=init_company)
-        industry = c2.selectbox(
+
+        # ▼ キーボードの出ないピル型/ラジオボタン選択肢
+        industry = c2.radio(
             "業界・ジャンル",
             INDUSTRY_LIST,
             index=INDUSTRY_LIST.index(init_industry),
+            horizontal=True,
         )
 
         my_id = c1.text_input("ログインID*", value=init_my_id)
         password = c2.text_input("パスワード", value=init_password)
 
-        status = c1.selectbox(
-            "ステータス", STATUS_LIST, index=STATUS_LIST.index(init_status)
+        status = c1.radio(
+            "ステータス",
+            STATUS_LIST,
+            index=STATUS_LIST.index(init_status),
+            horizontal=True,
         )
         url = c2.text_input("マイページURL", value=init_url)
 
@@ -320,9 +300,10 @@ st.divider()
 # --- 一覧表示・ソート・絞り込み ---
 st.subheader("📊 登録企業一覧")
 
-col_f1, col_f2 = st.columns([1, 2])
-filter_ind = col_f1.selectbox(
-    "🔍 業界で絞り込み", ["すべて"] + INDUSTRY_LIST
+filter_ind = st.radio(
+    "🔍 業界で絞り込み",
+    ["すべて"] + INDUSTRY_LIST,
+    horizontal=True,
 )
 
 display_df = df.copy()
