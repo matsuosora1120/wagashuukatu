@@ -4,15 +4,16 @@ import gspread
 from google.oauth2.service_account import Credentials
 import pandas as pd
 import streamlit as st
+import streamlit.components.v1 as components
 
 # ==========================================
-# 1. ページ設定 & CSS（入力禁止処理）
+# 1. ページ設定 & CSS・JS（タブレットキーボード防止処理）
 # ==========================================
 st.set_page_config(
     page_title="就活エントリー管理", page_icon="💼", layout="wide"
 )
 
-# セレクトボックス（ドロップダウン）へのキーボードタイピングを完全に禁止するCSS
+# ① CSS: カーソルを非表示にし、ポインターイベントを制御
 st.markdown(
     """
     <style>
@@ -24,6 +25,25 @@ st.markdown(
     </style>
     """,
     unsafe_allow_html=True,
+)
+
+# ② JavaScript: タブレットでタップした際にソフトキーボードが立ち上がるのを完全に防止
+components.html(
+    """
+    <script>
+    const setSelectReadonly = () => {
+        const inputs = parent.document.querySelectorAll('div[data-baseweb="select"] input');
+        inputs.forEach(input => {
+            input.setAttribute('readonly', 'true');
+            input.setAttribute('inputmode', 'none');
+        });
+    };
+    // 画面ロード時および定期的にreadonly属性を適用
+    setSelectReadonly();
+    setInterval(setSelectReadonly, 1000);
+    </script>
+    """,
+    height=0,
 )
 
 # ログイン用ユーザー情報 (ユーザー名: パスワード)
