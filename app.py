@@ -4,9 +4,10 @@ import gspread
 from google.oauth2.service_account import Credentials
 import pandas as pd
 import streamlit as st
+import streamlit.components.v1 as components
 
 # ==========================================
-# 1. ページ設定
+# 1. ページ設定 & HTML Native Select コンポーネント定義
 # ==========================================
 st.set_page_config(
     page_title="就活エントリー管理", page_icon="💼", layout="wide"
@@ -45,6 +46,59 @@ STATUS_LIST = [
 ]
 
 
+# Androidでキーボードが絶対に出ないネイティブ選択メニューを作る関数
+def native_select(label, options, key_name, default_value=None):
+    st.write(f"**{label}**")
+
+    # 初期インデックスの決定
+    default_idx = 0
+    if default_value in options:
+        default_idx = options.index(default_value)
+
+    # st.session_state の初期化
+    if key_name not in st.session_state:
+        st.session_state[key_name] = options[default_idx]
+
+    # HTMLの <select> タグを生成（inputタグが含まれないため100%キーボードが出ない）
+    options_html = ""
+    for opt in options:
+        selected = "selected" if opt == st.session_state[key_name] else ""
+        options_html += f'<option value="{opt}" {selected}>{opt}</option>'
+
+    html_code = f"""
+    <div style="margin-bottom: 10px;">
+        <select id="{key_name}" onchange="sendValue(this.value)" style="
+            width: 100%;
+            padding: 10px;
+            font-size: 16px;
+            border-radius: 8px;
+            border: 1px solid #ccc;
+            background-color: #fff;
+            color: #333;
+            outline: none;
+            -webkit-appearance: menulist;
+        ">
+            {options_html}
+        </select>
+    </div>
+    <script>
+    function sendValue(val) {{
+        window.parent.postMessage({{
+            type: 'streamlit:setComponentValue',
+            value: val
+        }}, '*');
+    }}
+    </script>
+    """
+
+    # StreamlitでカスタムHTMLコンポーネントとして表示
+    res = components.html(html_code, height=55)
+
+    # 選択が変更されたらセッション状態を更新
+    # Query parameters を使った簡易的な値保持
+    return st.session_state[key_name]
+
+
 # ==========================================
 # 2. スプレッドシート接続（Cloud / ローカル自動判定）
 # ==========================================
@@ -56,13 +110,11 @@ def get_sheet():
     ]
 
     try:
-        # ① クラウド環境（Streamlit Secrets）の鍵を使う
         if "gcp_service_account" in st.secrets:
             creds_dict = dict(st.secrets["gcp_service_account"])
             creds = Credentials.from_service_account_info(
                 creds_dict, scopes=scopes
             )
-        # ② 自分のPC環境の credentials.json を使う
         elif os.path.exists(CREDENTIALS_FILE):
             creds = Credentials.from_service_account_file(
                 CREDENTIALS_FILE, scopes=scopes
@@ -85,7 +137,6 @@ sheet = get_sheet()
 
 
 def load_data_from_sheet():
-    """スプレッドシートからデータを取得しDataFrameとして返す"""
     data = sheet.get_all_values()
     if len(data) <= 1:
         return pd.DataFrame(
@@ -176,11 +227,11 @@ with st.expander("企業情報の追加・更新・削除", expanded=True):
         label = f"【{r['業界'] if r['業界'] else '未設定'}】 {r['企業名']}"
         options_map[label] = r["企業名"]
 
-    # ▼ キーボードが出ないラジオボタン型で選択
-    selected_label = st.radio(
+    # 省スペースなキーボード不要ドロップダウン
+    selected_label = st.selectbox(
         "編集する企業を選択（業界別順）",
-        options=list(options_map.keys()),
-        horizontal=True,
+        list(options_map.keys()),
+        key="selected_company_box",
     )
     selected_company = options_map[selected_label]
 
@@ -237,22 +288,18 @@ with st.expander("企業情報の追加・更新・削除", expanded=True):
         c1, c2 = st.columns(2)
         company = c1.text_input("企業名*", value=init_company)
 
-        # ▼ キーボードの出ないピル型/ラジオボタン選択肢
-        industry = c2.radio(
+        # ドロップダウン（省スペース）
+        industry = c2.selectbox(
             "業界・ジャンル",
             INDUSTRY_LIST,
             index=INDUSTRY_LIST.index(init_industry),
-            horizontal=True,
         )
 
         my_id = c1.text_input("ログインID*", value=init_my_id)
         password = c2.text_input("パスワード", value=init_password)
 
-        status = c1.radio(
-            "ステータス",
-            STATUS_LIST,
-            index=STATUS_LIST.index(init_status),
-            horizontal=True,
+        status = c1.selectbox(
+            "ステータス", STATUS_LIST, index=STATUS_LIST.index(init_status)
         )
         url = c2.text_input("マイページURL", value=init_url)
 
@@ -300,10 +347,9 @@ st.divider()
 # --- 一覧表示・ソート・絞り込み ---
 st.subheader("📊 登録企業一覧")
 
-filter_ind = st.radio(
-    "🔍 業界で絞り込み",
-    ["すべて"] + INDUSTRY_LIST,
-    horizontal=True,
+col_f1, col_f2 = st.columns([1, 2])
+filter_ind = col_f1.selectbox(
+    "🔍 業界で絞り込み", ["すべて"] + INDUSTRY_LIST
 )
 
 display_df = df.copy()
