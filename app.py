@@ -5,9 +5,6 @@ from google.oauth2.service_account import Credentials
 import pandas as pd
 import streamlit as st
 
-# Streamlitの機能を使ってクリップボードコピーを有効化
-import streamlit.components.v1 as components
-
 # ==========================================
 # 1. ページ設定 & ユーザー認証情報
 # ==========================================
@@ -191,26 +188,18 @@ with st.expander("企業情報の追加・更新・削除", expanded=True):
         )
         init_status, init_memo, init_url = "エントリー済", "", ""
 
-    # ★ 1タップでコピーできるボタンの配置
-    if selected_company != "【新規登録】":
-        st.markdown("**📋 ワンタップでコピー**")
+    # ★ 確実にコピーできる表示エリア
+    if selected_company != "【新規登録】" and (init_my_id or init_password):
+        st.markdown("**📋 コピー用エリア（右端のコピーボタンを押してください）**")
         cp_col1, cp_col2 = st.columns(2)
 
         if init_my_id:
-            if cp_col1.button(f"📋 IDをコピー ({init_my_id})"):
-                components.html(
-                    f"<script>navigator.clipboard.writeText('{init_my_id}');</script>",
-                    height=0,
-                )
-                st.toast("IDをコピーしました！", icon="✅")
+            cp_col1.caption("▼ ログインID")
+            cp_col1.code(init_my_id, language=None)
 
         if init_password:
-            if cp_col2.button(f"📋 パスワードをコピー"):
-                components.html(
-                    f"<script>navigator.clipboard.writeText('{init_password}');</script>",
-                    height=0,
-                )
-                st.toast("パスワードをコピーしました！", icon="✅")
+            cp_col2.caption("▼ パスワード")
+            cp_col2.code(init_password, language=None)
 
     with st.form("entry_form"):
         c1, c2 = st.columns(2)
