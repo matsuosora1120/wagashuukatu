@@ -163,8 +163,22 @@ st.subheader("📝 データの登録 / 編集")
 with st.expander("企業情報の追加・更新・削除", expanded=True):
     col_a, col_b = st.columns(2)
 
-    company_options = ["【新規登録】"] + list(df["企業名"].values)
-    selected_company = col_a.selectbox("編集する企業を選択", company_options)
+    # --- ★ 業界順に並び替えた選択肢リストを作成 ---
+    df_sorted = df.copy()
+    
+    # INDUSTRY_LIST の順番通りにソート（リストにない業界は末尾へ）
+    industry_order = {ind: idx for idx, ind in enumerate(INDUSTRY_LIST)}
+    df_sorted['industry_rank'] = df_sorted['業界'].map(lambda x: industry_order.get(x, 999))
+    df_sorted = df_sorted.sort_values(by=['industry_rank', '企業名']).reset_index(drop=True)
+
+    # 選択肢用ラベルの作成 (例: "【IT・通信】 株式会社〇〇")
+    options_map = {"【新規登録】": "【新規登録】"}
+    for _, r in df_sorted.iterrows():
+        label = f"【{r['業界'] if r['業界'] else '未設定'}】 {r['企業名']}"
+        options_map[label] = r['企業名']
+
+    selected_label = col_a.selectbox("編集する企業を選択（業界別順）", list(options_map.keys()))
+    selected_company = options_map[selected_label]
 
     if selected_company != "【新規登録】":
         row = df[df["企業名"] == selected_company].iloc[0]
@@ -188,7 +202,7 @@ with st.expander("企業情報の追加・更新・削除", expanded=True):
         )
         init_status, init_memo, init_url = "エントリー済", "", ""
 
-    # ★ コピー用エリア ＆ サイトに飛ぶボタン
+    # コピー用エリア ＆ サイトに飛ぶボタン
     if selected_company != "【新規登録】":
         st.markdown("**📋 コピー用情報 ＆ マイページリンク**")
         cp_col1, cp_col2, cp_col3 = st.columns([2, 2, 1.5])
@@ -201,12 +215,10 @@ with st.expander("企業情報の追加・更新・削除", expanded=True):
             cp_col2.caption("▼ パスワード")
             cp_col2.code(init_password, language=None)
 
-        # サイトへアクセスするボタン
         cp_col3.caption("▼ マイページ")
         if init_url and init_url.startswith("http"):
             cp_col3.link_button("🌐 サイトを開く", init_url, use_container_width=True)
         elif init_url:
-            # httpから始まらない場合は自動で付与
             cp_col3.link_button(
                 "🌐 サイトを開く", f"https://{init_url}", use_container_width=True
             )
