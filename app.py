@@ -188,10 +188,10 @@ with st.expander("企業情報の追加・更新・削除", expanded=True):
         )
         init_status, init_memo, init_url = "エントリー済", "", ""
 
-    # ★ 確実にコピーできる表示エリア
-    if selected_company != "【新規登録】" and (init_my_id or init_password):
-        st.markdown("**📋 コピー用エリア（右端のコピーボタンを押してください）**")
-        cp_col1, cp_col2 = st.columns(2)
+    # ★ コピー用エリア ＆ サイトに飛ぶボタン
+    if selected_company != "【新規登録】":
+        st.markdown("**📋 コピー用情報 ＆ マイページリンク**")
+        cp_col1, cp_col2, cp_col3 = st.columns([2, 2, 1.5])
 
         if init_my_id:
             cp_col1.caption("▼ ログインID")
@@ -200,6 +200,18 @@ with st.expander("企業情報の追加・更新・削除", expanded=True):
         if init_password:
             cp_col2.caption("▼ パスワード")
             cp_col2.code(init_password, language=None)
+
+        # サイトへアクセスするボタン
+        cp_col3.caption("▼ マイページ")
+        if init_url and init_url.startswith("http"):
+            cp_col3.link_button("🌐 サイトを開く", init_url, use_container_width=True)
+        elif init_url:
+            # httpから始まらない場合は自動で付与
+            cp_col3.link_button(
+                "🌐 サイトを開く", f"https://{init_url}", use_container_width=True
+            )
+        else:
+            cp_col3.info("URL未登録")
 
     with st.form("entry_form"):
         c1, c2 = st.columns(2)
