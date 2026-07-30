@@ -7,7 +7,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 
 # ==========================================
-# 1. ページ設定 & HTML Native Select コンポーネント定義
+# 1. ページ設定
 # ==========================================
 st.set_page_config(
     page_title="就活エントリー管理", page_icon="💼", layout="wide"
@@ -46,43 +46,50 @@ STATUS_LIST = [
 ]
 
 
-# Androidでキーボードが絶対に出ないネイティブ選択メニューを作る関数
+# ==========================================
+# 2. キーボードが出ない Native Select 関数
+# ==========================================
 def native_select(label, options, key_name, default_value=None):
-    st.write(f"**{label}**")
+    """
+    Androidのキーボードを絶対に起動させないHTML標準の<select>タグコンポーネント
+    """
+    st.markdown(f"**{label}**")
 
-    # 初期インデックスの決定
-    default_idx = 0
+    # 初期値の設定
     if default_value in options:
-        default_idx = options.index(default_value)
+        current_val = default_value
+    else:
+        current_val = options[0]
 
-    # st.session_state の初期化
     if key_name not in st.session_state:
-        st.session_state[key_name] = options[default_idx]
+        st.session_state[key_name] = current_val
 
-    # HTMLの <select> タグを生成（inputタグが含まれないため100%キーボードが出ない）
+    # HTMLの作成 (inputタグが無いためキーボードが起動しない)
     options_html = ""
     for opt in options:
         selected = "selected" if opt == st.session_state[key_name] else ""
         options_html += f'<option value="{opt}" {selected}>{opt}</option>'
 
     html_code = f"""
-    <div style="margin-bottom: 10px;">
-        <select id="{key_name}" onchange="sendValue(this.value)" style="
+    <div style="margin-bottom: 5px;">
+        <select id="{key_name}" onchange="sendMessage(this.value)" style="
             width: 100%;
             padding: 10px;
             font-size: 16px;
             border-radius: 8px;
-            border: 1px solid #ccc;
-            background-color: #fff;
-            color: #333;
+            border: 1px solid #d3d3d3;
+            background-color: #ffffff;
+            color: #333333;
             outline: none;
+            cursor: pointer;
             -webkit-appearance: menulist;
         ">
             {options_html}
         </select>
     </div>
     <script>
-    function sendValue(val) {{
+    function sendMessage(val) {{
+        // Streamlitへ選択された値を送信
         window.parent.postMessage({{
             type: 'streamlit:setComponentValue',
             value: val
@@ -91,16 +98,19 @@ def native_select(label, options, key_name, default_value=None):
     </script>
     """
 
-    # StreamlitでカスタムHTMLコンポーネントとして表示
-    res = components.html(html_code, height=55)
+    # コンポーネント呼び出し（高さをフィットさせる）
+    selected_value = components.html(html_code, height=50)
 
-    # 選択が変更されたらセッション状態を更新
-    # Query parameters を使った簡易的な値保持
+    # ユーザーが選択肢を変更した場合、session_stateを更新
+    if selected_value is not None and selected_value != st.session_state[key_name]:
+        st.session_state[key_name] = selected_value
+        st.rerun()
+
     return st.session_state[key_name]
 
 
 # ==========================================
-# 2. スプレッドシート接続（Cloud / ローカル自動判定）
+# 3. スプレッドシート接続（Cloud / ローカル自動判定）
 # ==========================================
 @st.cache_resource
 def get_sheet():
@@ -110,11 +120,13 @@ def get_sheet():
     ]
 
     try:
+        # ① クラウド環境（Streamlit Secrets）の鍵を使う
         if "gcp_service_account" in st.secrets:
             creds_dict = dict(st.secrets["gcp_service_account"])
             creds = Credentials.from_service_account_info(
                 creds_dict, scopes=scopes
             )
+        # ② 自分のPC環境の credentials.json を使う
         elif os.path.exists(CREDENTIALS_FILE):
             creds = Credentials.from_service_account_file(
                 CREDENTIALS_FILE, scopes=scopes
@@ -137,6 +149,7 @@ sheet = get_sheet()
 
 
 def load_data_from_sheet():
+    """スプレッドシートからデータを取得しDataFrameとして返す"""
     data = sheet.get_all_values()
     if len(data) <= 1:
         return pd.DataFrame(
@@ -169,7 +182,7 @@ def load_data_from_sheet():
 
 
 # ==========================================
-# 3. ログイン画面
+# 4. ログイン画面
 # ==========================================
 if "logged_in" not in st.session_state:
     st.session_state["logged_in"] = False
@@ -197,7 +210,7 @@ if not st.session_state["logged_in"]:
 
 
 # ==========================================
-# 4. メイン画面（ログイン後）
+# 5. メイン画面（ログイン後）
 # ==========================================
 st.sidebar.write(f"👤 **ログイン中:** `{st.session_state['username']}`")
 if st.sidebar.button("🚪 ログアウト"):
@@ -227,13 +240,14 @@ with st.expander("企業情報の追加・更新・削除", expanded=True):
         label = f"【{r['業界'] if r['業界'] else '未設定'}】 {r['企業名']}"
         options_map[label] = r["企業名"]
 
-    # 省スペースなキーボード不要ドロップダウン
-    selected_label = st.selectbox(
+    # 1. 企業選択 (native_select)
+    company_labels = list(options_map.keys())
+    selected_label = native_select(
         "編集する企業を選択（業界別順）",
-        list(options_map.keys()),
-        key="selected_company_box",
+        company_labels,
+        key_name="select_company_native",
     )
-    selected_company = options_map[selected_label]
+    selected_company = options_map.get(selected_label, "【新規登録】")
 
     if selected_company != "【新規登録】":
         row = df[df["企業名"] == selected_company].iloc[0]
@@ -284,59 +298,65 @@ with st.expander("企業情報の追加・更新・削除", expanded=True):
         else:
             cp_col3.info("URL未登録")
 
-    with st.form("entry_form"):
-        c1, c2 = st.columns(2)
-        company = c1.text_input("企業名*", value=init_company)
+    st.markdown("---")
+    
+    # HTMLコンポーネント(native_select)の値漏れを防ぐため、form枠は外して直接入力エリアを設置
+    col1, col2 = st.columns(2)
+    company = col1.text_input("企業名*", value=init_company, key="input_company")
 
-        # ドロップダウン（省スペース）
-        industry = c2.selectbox(
-            "業界・ジャンル",
-            INDUSTRY_LIST,
-            index=INDUSTRY_LIST.index(init_industry),
-        )
+    # 2. 業界選択 (native_select)
+    industry = native_select(
+        "業界・ジャンル",
+        INDUSTRY_LIST,
+        key_name="industry_native",
+        default_value=init_industry,
+    )
 
-        my_id = c1.text_input("ログインID*", value=init_my_id)
-        password = c2.text_input("パスワード", value=init_password)
+    my_id = col1.text_input("ログインID*", value=init_my_id, key="input_my_id")
+    password = col2.text_input("パスワード", value=init_password, key="input_password")
 
-        status = c1.selectbox(
-            "ステータス", STATUS_LIST, index=STATUS_LIST.index(init_status)
-        )
-        url = c2.text_input("マイページURL", value=init_url)
+    # 3. ステータス選択 (native_select)
+    status = native_select(
+        "ステータス",
+        STATUS_LIST,
+        key_name="status_native",
+        default_value=init_status,
+    )
 
-        memo = st.text_input("メモ", value=init_memo)
+    url = col2.text_input("マイページURL", value=init_url, key="input_url")
+    memo = st.text_input("メモ", value=init_memo, key="input_memo")
 
-        btn_save = st.form_submit_button("💾 保存（新規追加 / 上書き）")
+    st.write("")
+    btn_save = st.button("💾 保存（新規追加 / 上書き）", type="primary")
 
-        if btn_save:
-            if not company or not my_id:
-                st.error("企業名とログインIDは必須項目です。")
+    if btn_save:
+        if not company or not my_id:
+            st.error("企業名とログインIDは必須項目です。")
+        else:
+            new_row = [
+                company,
+                industry,
+                my_id,
+                password,
+                status,
+                memo,
+                url,
+            ]
+
+            if (
+                selected_company != "【新規登録】"
+                and selected_company in df["企業名"].values
+            ):
+                row_idx = df[df["企業名"] == selected_company].index[0] + 2
+                sheet.update(f"A{row_idx}:G{row_idx}", [new_row])
+                st.success(f"「{company}」を更新しました！")
             else:
-                new_row = [
-                    company,
-                    industry,
-                    my_id,
-                    password,
-                    status,
-                    memo,
-                    url,
-                ]
-
-                if (
-                    selected_company != "【新規登録】"
-                    and selected_company in df["企業名"].values
-                ):
-                    row_idx = (
-                        df[df["企業名"] == selected_company].index[0] + 2
-                    )
-                    sheet.update(f"A{row_idx}:G{row_idx}", [new_row])
-                    st.success(f"「{company}」を更新しました！")
-                else:
-                    sheet.append_row(new_row)
-                    st.success(f"「{company}」を新規登録しました！")
-                st.rerun()
+                sheet.append_row(new_row)
+                st.success(f"「{company}」を新規登録しました！")
+            st.rerun()
 
     if selected_company != "【新規登録】":
-        if st.button("🗑️ 選択中の企業を削除", type="primary"):
+        if st.button("🗑️ 選択中の企業を削除"):
             row_idx = df[df["企業名"] == selected_company].index[0] + 2
             sheet.delete_rows(row_idx)
             st.success(f"「{selected_company}」を削除しました。")
@@ -348,9 +368,15 @@ st.divider()
 st.subheader("📊 登録企業一覧")
 
 col_f1, col_f2 = st.columns([1, 2])
-filter_ind = col_f1.selectbox(
-    "🔍 業界で絞り込み", ["すべて"] + INDUSTRY_LIST
-)
+
+with col_f1:
+    # 4. 業界絞り込み (native_select)
+    filter_ind = native_select(
+        "🔍 業界で絞り込み",
+        ["すべて"] + INDUSTRY_LIST,
+        key_name="filter_industry_native",
+        default_value="すべて",
+    )
 
 display_df = df.copy()
 if filter_ind != "すべて":
