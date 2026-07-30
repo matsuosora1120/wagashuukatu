@@ -13,8 +13,7 @@ st.set_page_config(
 )
 
 # ログイン用ユーザー情報 (ユーザー名: パスワード)
-# ※必要に応じてパスワードを変更してください
-USERS = {"admin": "password123", "student": "my_job_search_2026"}
+USERS = {"sora": "112358"}
 
 SPREADSHEET_NAME = "就活管理"
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -144,13 +143,13 @@ if not st.session_state["logged_in"]:
             else:
                 st.error("ユーザーIDまたはパスワードが正しくありません。")
 
-    st.stop()  # 未ログイン時はここで処理を停止
+    st.stop()
 
 
 # ==========================================
 # 4. メイン画面（ログイン後）
 # ==========================================
-# サイドバー（ユーザー情報 & ログアウト）
+# サイドバー
 st.sidebar.write(f"👤 **ログイン中:** `{st.session_state['username']}`")
 if st.sidebar.button("🚪 ログアウト"):
     st.session_state["logged_in"] = False
@@ -168,11 +167,9 @@ st.subheader("📝 データの登録 / 編集")
 with st.expander("企業情報の追加・更新・削除", expanded=True):
     col_a, col_b = st.columns(2)
 
-    # 既存企業の選択（編集・削除用）
     company_options = ["【新規登録】"] + list(df["企業名"].values)
     selected_company = col_a.selectbox("編集する企業を選択", company_options)
 
-    # 選択した企業データの初期値設定
     if selected_company != "【新規登録】":
         row = df[df["企業名"] == selected_company].iloc[0]
         init_company = row["企業名"]
@@ -194,6 +191,14 @@ with st.expander("企業情報の追加・更新・削除", expanded=True):
             "",
         )
         init_status, init_memo, init_url = "エントリー済", "", ""
+
+    # コピー用の簡易表示（既存企業選択時のみ）
+    if selected_company != "【新規登録】" and init_my_id:
+        st.markdown("**📋 コピー用ログイン情報（右端アイコンで1タップコピー）**")
+        c_copy1, c_copy2 = st.columns(2)
+        c_copy1.code(init_my_id, language=None)
+        if init_password:
+            c_copy2.code(init_password, language=None)
 
     with st.form("entry_form"):
         c1, c2 = st.columns(2)
@@ -230,14 +235,13 @@ with st.expander("企業情報の追加・更新・削除", expanded=True):
                     url,
                 ]
 
-                # 既存企業の場合は上書き、新規の場合は追記
                 if (
                     selected_company != "【新規登録】"
                     and selected_company in df["企業名"].values
                 ):
                     row_idx = (
                         df[df["企業名"] == selected_company].index[0] + 2
-                    )  # ヘッダー分+2
+                    )
                     sheet.update(f"A{row_idx}:G{row_idx}", [new_row])
                     st.success(f"「{company}」を更新しました！")
                 else:
@@ -245,7 +249,6 @@ with st.expander("企業情報の追加・更新・削除", expanded=True):
                     st.success(f"「{company}」を新規登録しました！")
                 st.rerun()
 
-    # 削除ボタン
     if selected_company != "【新規登録】":
         if st.button("🗑️ 選択中の企業を削除", type="primary"):
             row_idx = df[df["企業名"] == selected_company].index[0] + 2
@@ -263,16 +266,14 @@ filter_ind = col_f1.selectbox(
     "🔍 業界で絞り込み", ["すべて"] + INDUSTRY_LIST
 )
 
-# 絞り込み処理
 display_df = df.copy()
 if filter_ind != "すべて":
     display_df = display_df[display_df["業界"] == filter_ind]
 
-# デフォルトで業界順に初期ソート
 display_df = display_df.sort_values(by="業界", ascending=True)
 
 st.info(
-    "💡 表の見出し（「業界」「ステータス」など）をクリックすると、昇順・降順に並び替えできます。"
+    "💡 表の見出し（「業界」「ステータス」など）をクリックするとソートできます。"
 )
 
 st.dataframe(
@@ -280,6 +281,6 @@ st.dataframe(
     use_container_width=True,
     hide_index=True,
     column_config={
-        "URL": st.column_config.LinkColumn("マイページURL"),  # クリック可能なリンク
+        "URL": st.column_config.LinkColumn("マイページURL"),
     },
 )
