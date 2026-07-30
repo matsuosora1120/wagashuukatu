@@ -6,10 +6,24 @@ import pandas as pd
 import streamlit as st
 
 # ==========================================
-# 1. ページ設定 & ユーザー認証情報
+# 1. ページ設定 & CSS（入力禁止処理）
 # ==========================================
 st.set_page_config(
     page_title="就活エントリー管理", page_icon="💼", layout="wide"
+)
+
+# セレクトボックス（ドロップダウン）へのキーボードタイピングを完全に禁止するCSS
+st.markdown(
+    """
+    <style>
+    /* selectboxのテキスト入力欄へのタイピング・カーソル表示を無効化 */
+    div[data-baseweb="select"] input {
+        caret-color: transparent !important;
+        pointer-events: none !important;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
 )
 
 # ログイン用ユーザー情報 (ユーザー名: パスワード)
@@ -163,21 +177,24 @@ st.subheader("📝 データの登録 / 編集")
 with st.expander("企業情報の追加・更新・削除", expanded=True):
     col_a, col_b = st.columns(2)
 
-    # --- ★ 業界順に並び替えた選択肢リストを作成 ---
+    # 業界順にソートしたドロップダウン選択肢の作成
     df_sorted = df.copy()
-    
-    # INDUSTRY_LIST の順番通りにソート（リストにない業界は末尾へ）
     industry_order = {ind: idx for idx, ind in enumerate(INDUSTRY_LIST)}
-    df_sorted['industry_rank'] = df_sorted['業界'].map(lambda x: industry_order.get(x, 999))
-    df_sorted = df_sorted.sort_values(by=['industry_rank', '企業名']).reset_index(drop=True)
+    df_sorted["industry_rank"] = df_sorted["業界"].map(
+        lambda x: industry_order.get(x, 999)
+    )
+    df_sorted = df_sorted.sort_values(
+        by=["industry_rank", "企業名"]
+    ).reset_index(drop=True)
 
-    # 選択肢用ラベルの作成 (例: "【IT・通信】 株式会社〇〇")
     options_map = {"【新規登録】": "【新規登録】"}
     for _, r in df_sorted.iterrows():
         label = f"【{r['業界'] if r['業界'] else '未設定'}】 {r['企業名']}"
-        options_map[label] = r['企業名']
+        options_map[label] = r["企業名"]
 
-    selected_label = col_a.selectbox("編集する企業を選択（業界別順）", list(options_map.keys()))
+    selected_label = col_a.selectbox(
+        "編集する企業を選択（業界別順）", list(options_map.keys())
+    )
     selected_company = options_map[selected_label]
 
     if selected_company != "【新規登録】":
@@ -202,7 +219,7 @@ with st.expander("企業情報の追加・更新・削除", expanded=True):
         )
         init_status, init_memo, init_url = "エントリー済", "", ""
 
-    # コピー用エリア ＆ サイトに飛ぶボタン
+    # コピー用エリア ＆ サイトを開くボタン
     if selected_company != "【新規登録】":
         st.markdown("**📋 コピー用情報 ＆ マイページリンク**")
         cp_col1, cp_col2, cp_col3 = st.columns([2, 2, 1.5])
@@ -217,10 +234,14 @@ with st.expander("企業情報の追加・更新・削除", expanded=True):
 
         cp_col3.caption("▼ マイページ")
         if init_url and init_url.startswith("http"):
-            cp_col3.link_button("🌐 サイトを開く", init_url, use_container_width=True)
+            cp_col3.link_button(
+                "🌐 サイトを開く", init_url, use_container_width=True
+            )
         elif init_url:
             cp_col3.link_button(
-                "🌐 サイトを開く", f"https://{init_url}", use_container_width=True
+                "🌐 サイトを開く",
+                f"https://{init_url}",
+                use_container_width=True,
             )
         else:
             cp_col3.info("URL未登録")
